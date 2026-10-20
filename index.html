@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#F6EEDF">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -48,7 +48,10 @@ body {
   -webkit-touch-callout: none;
   overscroll-behavior: none;
 }
-button { font: inherit; color: inherit; touch-action: manipulation; cursor: pointer; }
+/* ダブルタップでの拡大を止める。盤面だけはなぞり操作のため none */
+* { touch-action: manipulation; }
+.board, .board * { touch-action: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
 button:focus-visible, .cell:focus-visible { outline: 3px solid var(--yaki); outline-offset: 2px; }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 
@@ -1831,6 +1834,21 @@ const NekoEngine = (() => {
   el.board.addEventListener('pointerup', (e) => endDrag(e, false));
   el.board.addEventListener('pointercancel', (e) => endDrag(e, true));
   el.board.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // ================= ダブルタップでの画面拡大を止める =================
+  // viewport と touch-action の指定に加えて、すばやく同じあたりを2回タップしたときの既定動作を取り消す
+  // （ボタンは連打しても1回ずつ反応させたいので対象外）
+  el.board.addEventListener('click', () => {}); // iPhone に盤面を「タップに反応する場所」と認識させる
+  let lastTouch = null;
+  document.addEventListener('touchend', (e) => {
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    const now = performance.now();
+    const quick = lastTouch && now - lastTouch.t < 450 && Math.abs(t.clientX - lastTouch.x) < 40 && Math.abs(t.clientY - lastTouch.y) < 40;
+    const onButton = e.target && e.target.closest && e.target.closest('button');
+    if (quick && !onButton && e.cancelable) e.preventDefault();
+    lastTouch = { t: now, x: t.clientX, y: t.clientY };
+  }, { passive: false });
 
   // ================= モーダル =================
   function openModal(id) { el.toast.classList.remove('show'); $(id).hidden = false; }
